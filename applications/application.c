@@ -30,156 +30,69 @@
 #include "stm32_eth.h"
 #endif
 
-void rt_init_thread_entry(void* parameter)
+static struct rt_messagequeue  rx_mq;
+static char msg_pool[1024]; 
+struct  rx_msg
 {
-    /* LwIP Initialization */
-#ifdef RT_USING_LWIP
-    {
-        extern void lwip_sys_init(void);
+  rt_device_t dev;
+  rt_size_t size;
+};
 
-        /* register ethernetif device */
-        eth_system_device_init();
 
-        rt_hw_stm32_eth_init();
-        /* re-init device driver */
-        rt_device_init_all();
-
-        /* init lwip system */
-        lwip_sys_init();
-        rt_kprintf("TCP/IP initialized!\n");
-    }
-#endif
-
-//FS
-
-//GUI
+rt_err_t uart_input_proc(rt_device_t dev, rt_size_t size) {
+  struct rx_msg msg;
+  msg.dev = dev;
+  msg.size = size;
+  return rt_mq_send(&rx_mq, &msg, sizeof(struct rx_msg));
 }
 
-float f_var1;
-float f_var2;
-float f_var3;
-float f_var4;
-
 ALIGN(RT_ALIGN_SIZE)
-static char thread_led1_stack[1024];
-struct rt_thread thread_led1;
-static void rt_thread_entry_led1(void* parameter)
+static char thread_uart_recv_stack[512];
+struct rt_thread thread_uart_recv;
+static void rt_thread_entry_uart_recv(void* parameter)
 {
-    GPIO_InitTypeDef  GPIO_InitStructure;
-
-    /* GPIOD Periph clock enable */
-    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
-
-    /* Configure PD12, PD13, PD14 and PD15 in output pushpull mode */
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_12 | GPIO_Pin_13| GPIO_Pin_14| GPIO_Pin_15;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
-    GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
-    GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-    GPIO_Init(GPIOD, &GPIO_InitStructure);
-
-    f_var1 = 3.141592653;
-    f_var2 = 123.456;
-    f_var3 = 0.123456789;
-    f_var4 = 1.00001;
-
-    while (1)
-    {
-        /* PD12 to be toggled */
-        GPIO_SetBits(GPIOD, GPIO_Pin_12);
-
-        /* Insert delay */
-        rt_thread_delay(RT_TICK_PER_SECOND/2);
-        f_var3 += f_var4;
-        f_var4 = f_var4 * f_var4;
-
-        /* PD13 to be toggled */
-        GPIO_SetBits(GPIOD, GPIO_Pin_13);
-
-        /* Insert delay */
-        rt_thread_delay(RT_TICK_PER_SECOND/2);
-        f_var3 += f_var4;
-        f_var4 = f_var4 * f_var4;
-
-        /* PD14 to be toggled */
-        GPIO_SetBits(GPIOD, GPIO_Pin_14);
-
-        /* Insert delay */
-        rt_thread_delay(RT_TICK_PER_SECOND/2);
-        f_var3 += f_var4;
-        f_var4 = f_var4 * f_var4;
-
-        /* PD15 to be toggled */
-        GPIO_SetBits(GPIOD, GPIO_Pin_15);
-
-        /* Insert delay */
-        rt_thread_delay(RT_TICK_PER_SECOND*2);
-        f_var3 += f_var4;
-        f_var4 = f_var4 * f_var4;
-
-        GPIO_ResetBits(GPIOD, GPIO_Pin_12|GPIO_Pin_13|GPIO_Pin_14|GPIO_Pin_15);
-
-        /* Insert delay */
-        rt_thread_delay(RT_TICK_PER_SECOND);
-        f_var3 += f_var4;
-        f_var4 = f_var4 * f_var4;
+  rt_device_t device;
+  rt_err_t result = RT_EOK;
+  struct rx_msg msg;  
+  static char uart_rx_buffer[64];
+  device = rt_device_find("uart1");
+  if (device == RT_NULL) {
+    rt_kprintf("Device not found!\r\n");
+  } else {
+    rt_device_set_rx_indicate(device, uart_input_proc);
+    result = rt_device_open(device, RT_DEVICE_OFLAG_RDWR);
+  }
+  while(1) {
+    result = rt_mq_recv(&rx_mq, &msg, sizeof(struct rx_msg), 50);
+    if (result == -RT_ETIMEOUT) {
+    
     }
-}
-
-
-ALIGN(RT_ALIGN_SIZE)
-static char thread_led2_stack[1024];
-struct rt_thread thread_led2;
-static void rt_thread_entry_led2(void* parameter)
-{
-    float f_var_me;
-
-    char str_buffer[256];
-    while(1)
-    {
-        f_var_me = f_var1 * f_var2 + f_var3;
-        sprintf(str_buffer, "%f", f_var_me);
-        rt_kprintf("thread1 %s\r\n", str_buffer);
-        rt_thread_delay(RT_TICK_PER_SECOND);
+    else if (result == RT_EOK) {
+      rt_uint16_t rx_length = 0;
+      rx_length = (sizeof(uart_rx_buffer) - 1) > msg.size ?  
+                msg.size : sizeof(uart_rx_buffer) - 1;
+      rx_length = rt_device_read(device, 0, &uart_rx_buffer[0], rx_length);
+      uart_rx_buffer[rx_length] = '\0'; 
+      rt_device_write(device, 0, &uart_rx_buffer[0], rx_length);
     }
+  }
 }
 
 int rt_application_init()
 {
-    rt_thread_t init_thread;
-
-#if (RT_THREAD_PRIORITY_MAX == 32)
-    init_thread = rt_thread_create("init",
-                                   rt_init_thread_entry, RT_NULL,
-                                   2048, 8, 20);
-#else
-    init_thread = rt_thread_create("init",
-                                   rt_init_thread_entry, RT_NULL,
-                                   2048, 80, 20);
-#endif
-
-    if (init_thread != RT_NULL)
-        rt_thread_startup(init_thread);
-
-    //------- init led1 thread
-    rt_thread_init(&thread_led1,
-                   "led1",
-                   rt_thread_entry_led1,
-                   RT_NULL,
-                   &thread_led1_stack[0],
-                   sizeof(thread_led1_stack),11,5);
-    rt_thread_startup(&thread_led1);
-
-    //------- init led2 thread
-    rt_thread_init(&thread_led2,
-                   "led2",
-                   rt_thread_entry_led2,
-                   RT_NULL,
-                   &thread_led2_stack[0],
-                   sizeof(thread_led2_stack),11,5);
-    rt_thread_startup(&thread_led2);
-
-    return 0;
+  rt_err_t result;   
+  result = rt_mq_init(&rx_mq, "mqt", &msg_pool[0], 128 - sizeof(void*), sizeof(msg_pool), RT_IPC_FLAG_FIFO); 
+  if (result != RT_EOK) {   
+    rt_kprintf("init message queue failed.\n");
+  } 
+  rt_thread_init(&thread_uart_recv,
+                 "uart_recv",
+                 rt_thread_entry_uart_recv,
+                 RT_NULL,
+                 &thread_uart_recv_stack[0],
+                 sizeof(thread_uart_recv_stack), 11, 10);
+  rt_thread_startup(&thread_uart_recv);               
+  return 0;
 }
 
 /*@}*/
