@@ -96,8 +96,8 @@ struct rt_device uart3_device;
 #define UART3_TX_PIN_SOURCE GPIO_PinSource10
 #define UART3_GPIO_RX		GPIO_Pin_11
 #define UART3_RX_PIN_SOURCE GPIO_PinSource11
-#define UART3_GPIO			GPIOB
-#define UART3_GPIO_RCC   	RCC_AHB1Periph_GPIOB
+#define UART3_GPIO			GPIOC
+#define UART3_GPIO_RCC   	RCC_AHB1Periph_GPIOC
 #define RCC_APBPeriph_UART3	RCC_APB1Periph_USART3
 
 static void RCC_Configuration(void)
@@ -155,12 +155,12 @@ static void GPIO_Configuration(void)
 
 #ifdef RT_USING_UART3
 	/* Configure USART3 Rx/tx PIN */
-	GPIO_InitStructure.GPIO_Pin = UART3_GPIO_RX | UART3_GPIO_RX;
+	GPIO_InitStructure.GPIO_Pin = UART3_GPIO_TX | UART3_GPIO_RX;
 	GPIO_Init(UART3_GPIO, &GPIO_InitStructure);
 
     /* Connect alternate function */
-    GPIO_PinAFConfig(UART2_GPIO, UART3_TX_PIN_SOURCE, GPIO_AF_USART3);
-    GPIO_PinAFConfig(UART2_GPIO, UART3_RX_PIN_SOURCE, GPIO_AF_USART3);
+    GPIO_PinAFConfig(UART3_GPIO, UART3_TX_PIN_SOURCE, GPIO_AF_USART3);
+    GPIO_PinAFConfig(UART3_GPIO, UART3_RX_PIN_SOURCE, GPIO_AF_USART3);
 #endif
 }
 
@@ -188,7 +188,8 @@ static void NVIC_Configuration(void)
 #ifdef RT_USING_UART3
 	/* Enable the USART3 Interrupt */
 	NVIC_InitStructure.NVIC_IRQChannel = USART3_IRQn;
-	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;
+ //NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 2;
 	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
 	NVIC_Init(&NVIC_InitStructure);
 

@@ -63,7 +63,7 @@ static void rt_thread_entry_uart_recv(void* parameter) {
   rt_err_t result = RT_EOK;
   struct rx_msg msg;
   static char uart_rx_buffer[32];
-  device = rt_device_find("uart1");
+  device = rt_device_find("uart3");
   if (device == RT_NULL) {
     rt_kprintf("Device not found!\r\n");
   } else {
