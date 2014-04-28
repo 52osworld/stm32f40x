@@ -99,6 +99,7 @@ struct rt_device uart3_device;
 #define UART3_GPIO			GPIOC
 #define UART3_GPIO_RCC   	RCC_AHB1Periph_GPIOC
 #define RCC_APBPeriph_UART3	RCC_APB1Periph_USART3
+//#define UART3_GPIO_CTR GPIO_Pin_2
 
 static void RCC_Configuration(void)
 {
@@ -161,6 +162,13 @@ static void GPIO_Configuration(void)
     /* Connect alternate function */
     GPIO_PinAFConfig(UART3_GPIO, UART3_TX_PIN_SOURCE, GPIO_AF_USART3);
     GPIO_PinAFConfig(UART3_GPIO, UART3_RX_PIN_SOURCE, GPIO_AF_USART3);
+ 
+ //485 control pin
+ /*GPIO_InitStructure.GPIO_Pin = UART3_GPIO_CTR;
+ GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+ GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
+ GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+ GPIO_Init(GPIOH, &GPIO_InitStructure);*/
 #endif
 }
 
@@ -296,7 +304,7 @@ void rt_hw_usart_init()
 
 	/* register uart1 */
 	rt_hw_serial_register(&uart1_device, "uart1",
-		RT_DEVICE_FLAG_RDWR | RT_DEVICE_FLAG_INT_RX | RT_DEVICE_FLAG_STREAM,
+		RT_DEVICE_FLAG_RDWR | RT_DEVICE_FLAG_INT_RX | RT_DEVICE_FLAG_STREAM,  //NOTE: stream mode will turn 0x0a to 0x0d, 0x0a!!!
 		&uart1);
 
 	/* enable interrupt */
@@ -314,7 +322,7 @@ void rt_hw_usart_init()
 
 	/* register uart2 */
 	rt_hw_serial_register(&uart2_device, "uart2",
-		RT_DEVICE_FLAG_RDWR | RT_DEVICE_FLAG_INT_RX | RT_DEVICE_FLAG_STREAM,
+		RT_DEVICE_FLAG_RDWR | RT_DEVICE_FLAG_INT_RX | RT_DEVICE_FLAG_STREAM,  //NOTE: stream mode will turn 0x0a to 0x0d, 0x0a!!!
 		&uart2);
 
 	/* Enable USART2 DMA Rx request */
@@ -334,7 +342,7 @@ void rt_hw_usart_init()
 
 	/* register uart3 */
 	rt_hw_serial_register(&uart3_device, "uart3",
-		RT_DEVICE_FLAG_RDWR | RT_DEVICE_FLAG_INT_RX | RT_DEVICE_FLAG_STREAM,
+		RT_DEVICE_FLAG_RDWR | RT_DEVICE_FLAG_INT_RX | RT_DEVICE_FLAG_RDWR,  //DO NOT use RT_DEVICE_FLAG_STREAM 
 		&uart3);
 
 	/* enable interrupt */
