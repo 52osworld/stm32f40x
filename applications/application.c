@@ -55,7 +55,7 @@ static char lcd_display_temp[] = {0xAA, 0x1A, 0x02,
 static struct rt_messagequeue uart_1_rx_mq;  //message queue for uart1
 static struct rt_messagequeue uart_3_rx_mq;  //message queue for uart3
 static struct rt_messagequeue lcd_cmd_mq;   //message queue for lcd
-static char uart_1_msg_pool[512]; //message pool, size 512
+static char uart_1_msg_pool[512]; //message pool, size 512, CANNOT be smaller, or the UART would fail
 static char uart_3_msg_pool[512]; //message pool, size 512
 static char lcd_cmd_msg_pool[64]; 
 
