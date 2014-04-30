@@ -32,20 +32,25 @@
 
 //global variables 
 //background [AA][70][00 0A][CC 33 C3 3C]
-//float number: AA 1A 01 <X> <Y> <Mode> <Fcolor> <Bcolor> <Int_Value> CC 33 C3 3C
-//[AA][1A 02]
-//[00 32 
-//00 3C 
-//93 33 
-//F8 00 00 1F 42 F6 E6 66][CC 33 C3 3C]
+//Temp 1:[AA][1A 02] //float
+//[01 36 //x pos 310
+// 00 4E  //y pos 78, 100, 122, 144, 166, 188, 210
+// 32 //3 intergers, 2 floats, e.g: 123.45
+// 61 //no background color
+// 00 00 // font color black
+// 00 1F //foreground color doesn't matter
+// 42 F6 E9 79]  // 4 bytes float value
+// [CC 33 C3 3C]
+
 static char lcd_background_pic[]={0xAA, 0x70, 0x00, 10, 0xCC, 0x33, 0xC3, 0x3C}; //Background picture
 static char lcd_display_temp[] = {0xAA, 0x1A, 0x02, 
-                                  0x00, 0x20, 0x00, 0x30, //pos
-                                  0x32, 0xF3, //mode
-                                  0x00, 0x1F, //Fcolor
+                                  0x01, 0x36, 0x00, 0x4E, //pos
+                                  0x32, 0x61, //mode
+                                  0x00, 0x00, //Fcolor
                                   0xF8, 0x00, //Bcolor
                                   0x00, 0x00, 0x00, 0x00, // saved
                                   0xCC, 0x33, 0xC3, 0x3C};
+                                  
 //message ralated
 static struct rt_messagequeue uart_1_rx_mq;  //message queue for uart1
 static struct rt_messagequeue uart_3_rx_mq;  //message queue for uart3
@@ -87,7 +92,7 @@ static rt_err_t uart_3_input_proc(rt_device_t dev, rt_size_t size) {
 //@brief message received is reversed, so we need to reverse again using this function
 //@para *str the first byte in a string that needs reversed
 //@para length the total length that needs to be reversed, 0 included
-//e.g a = {1,2,3,4}, then rt_str_reverse(&a[0], 3) result in {4, 3, 2, 1}
+//e.g a[] = {1,2,3,4}, then rt_str_reverse(&a[0], 3) result in {4, 3, 2, 1}
 static void rt_str_reverse(char *str, int length) {
   char temp, *end_ptr;
   end_ptr = str + length;
@@ -100,11 +105,9 @@ static void rt_str_reverse(char *str, int length) {
   }
 }
 
-
+//@thread lcd_init
+//@brief this thread init the LCD screen with a background picture, it will execute only once
 static rt_thread_t lcd_init = RT_NULL;
-//@fn: lcd_init
-//@brief: init the LCD screen with a background pic
-//
 static void lcd_init_entry(void* parameter) {
   //AA 70 <Pic_ID> CC 33 C3 3C where Pic_ID is 2 bytes
   unsigned int i =65535;
@@ -209,7 +212,6 @@ ALIGN(RT_ALIGN_SIZE)
 static char thread_lcd_cmd_stack[512];
 struct rt_thread thread_lcd_cmd;  //receive temp data from zigbee through uart1
 static void thread_entry_lcd_cmd(void* parameter) {
-  //TODO: complete lcd cmds
   rt_uint16_t length = 0;
   rt_device_t device;
   rt_err_t result = RT_EOK;
