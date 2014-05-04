@@ -48,7 +48,7 @@ static char lcd_display_temp[] = {0xAA, 0x1A, 0x02,
                                   0x32, 0x61, //mode
                                   0x00, 0x00, //Fcolor
                                   0xF8, 0x00, //Bcolor
-                                  0x00, 0x00, 0x00, 0x00, // saved
+                                  0x00, 0x00, 0x00, 0x00, // saved for data
                                   0xCC, 0x33, 0xC3, 0x3C};
                                   
 //message ralated
@@ -56,7 +56,7 @@ static struct rt_messagequeue uart_1_rx_mq;  //message queue for uart1
 static struct rt_messagequeue uart_3_rx_mq;  //message queue for uart3
 static struct rt_messagequeue lcd_cmd_mq;   //message queue for lcd
 static char uart_1_msg_pool[512]; //message pool, size 512, CANNOT be smaller, or the UART would fail
-static char uart_3_msg_pool[512]; //message pool, size 512
+static char uart_3_msg_pool[512]; //message pool, size 512, CANNOT be smaller, or the UART would fail
 static char lcd_cmd_msg_pool[64]; 
 
 //self-defined message struct
@@ -142,7 +142,12 @@ ALIGN(RT_ALIGN_SIZE)
 static char thread_uart_recv_stack[512];
 struct rt_thread thread_uart_recv;  //receive temp data from zigbee through uart1
 static void thread_entry_uart_recv(void* parameter) {
-  float temp = 123.45;
+  float temp = 0.0;
+  float envir_temp_f = 0.0;
+  float temp_diff_f = 0.00;
+  unsigned int envir_temp_i = 0;
+  int temp_diff_i = 0;
+  unsigned char i = 0;
   char temp_data[4];
   rt_device_t device;
   rt_err_t result = RT_EOK;
@@ -162,15 +167,25 @@ static void thread_entry_uart_recv(void* parameter) {
     }
     else if (result == RT_EOK) {
       rt_uint16_t rx_length = 0;
-      rx_length = (sizeof(uart_rx_buffer) - 1) > msg.size ?  
-                  msg.size : sizeof(uart_rx_buffer) - 1;
-      rx_length = rt_device_read(device, 0, &uart_rx_buffer[0], rx_length);
-      uart_rx_buffer[rx_length] = '\0'; 
+      //rx_length = (sizeof(uart_rx_buffer) - 1) > msg.size ? msg.size : sizeof(uart_rx_buffer) - 1;
+      rt_thread_delay(5);
+      rx_length = rt_device_read(device, 0, &uart_rx_buffer[0], 8);//the length has to be 8 or it will not complete
       //TODO: process temp data and then display on LCD
-      rt_memcpy(&temp_data[0], &temp, 4);
-      //rt_device_write(device, 0, &temp_data[0], 4);
-      rt_mq_send(&lcd_cmd_mq, &temp_data[0], 4);
-      rt_device_write(device, 0, &uart_rx_buffer[0], rx_length);
+      if(uart_rx_buffer[7] == 0x33){
+        rt_str_reverse(&uart_rx_buffer[3],1);
+        rt_str_reverse(&uart_rx_buffer[5],1);
+        rt_memcpy(&envir_temp_i, &uart_rx_buffer[3], 2);
+        envir_temp_f = (float)(envir_temp_i/100.0);
+        rt_memcpy(&temp_diff_i, &uart_rx_buffer[5], 2);
+        temp_diff_f = (float)(temp_diff_i*2.048/32768*122.8501);
+        temp = envir_temp_f + temp_diff_f;
+        rt_memcpy(&temp_data[0], &temp, 4);
+        rt_mq_send(&lcd_cmd_mq, &temp_data[0], 4);
+        for (i=0;i<8;i++) {
+          uart_rx_buffer[i] = 0x00;
+        }
+      }
+      rt_device_write(device, 0, &uart_rx_buffer[0], rx_length);//TODO: this is just a confirmation, remove this
       //rt_thread_delay(5);
     }
   }
@@ -201,7 +216,6 @@ static void thread_entry_upper_recv(void* parameter) {
                   msg.size : sizeof(uart_rx_buffer) - 1;
       rx_length = rt_device_read(device, 0, &uart_rx_buffer[0], rx_length);
       //TODO: process cmds from upper machine
-      uart_rx_buffer[rx_length] = '\0';
       rt_device_write(device, 0, &uart_rx_buffer[0], rx_length);
       rt_thread_delay(5);
     }
@@ -293,7 +307,7 @@ int rt_application_init()
                  thread_entry_uart_recv,
                  RT_NULL,
                  &thread_uart_recv_stack[0],
-                 sizeof(thread_uart_recv_stack), 11, 10);
+                 sizeof(thread_uart_recv_stack), 11, 100);
   rt_thread_startup(&thread_uart_recv); 
   
   //init thread processing data from upper machine
@@ -314,7 +328,7 @@ int rt_application_init()
   rt_thread_startup(&thread_lcd_cmd);
   
   //init lcd
-  lcd_init = rt_thread_create("lcd_init", lcd_init_entry, (void*)1, 128, 10, 5);
+  lcd_init = rt_thread_create("lcd_init", lcd_init_entry, (void*)1, 128, 14, 5);
   if (lcd_init != RT_NULL) {
     rt_thread_startup(lcd_init);
   }
